@@ -1,7 +1,8 @@
-name: Update Jira Board
+name: Update Jira Board (Node.js)
+
 on:
   schedule:
-    - cron: '0 * * * *'  # каждый час
+    - cron: '0 * * * *'   # каждый час
   workflow_dispatch:      # ручной запуск
 
 jobs:
@@ -10,26 +11,23 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install requests
+          node-version: '20'
 
       - name: Generate board
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: python generate_board.py
+        run: node generate_board.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
-          publish_branch: gh-pages  # ветка для Pages
+          publish_branch: gh-pages
           force_orphan: true
