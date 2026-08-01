@@ -1,5 +1,5 @@
 // generate_board.ts
-const PROJECT_TITLE = "My Jira"; // точное название твоего проекта
+const PROJECT_TITLE = "My Jira";
 const TOKEN: string = process.env.GH_TOKEN ?? "";
 
 if (!TOKEN) {
@@ -7,16 +7,10 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-// ─── Типы ──────────────────────────────────────────────
+// Типы
 interface GitHubProject {
   id: string;
   title: string;
-}
-
-interface ProjectItem {
-  id: string;
-  fieldValues: FieldValue[];
-  content: IssueOrPR | null;
 }
 
 interface IssueOrPR {
@@ -30,6 +24,12 @@ type FieldValue =
   | { type: "select"; name: string; field: { name: string } }
   | { type: "unknown" };
 
+interface ProjectItem {
+  id: string;
+  fieldValues: FieldValue[];
+  content: IssueOrPR | null;
+}
+
 interface BoardCard {
   title: string;
   url: string;
@@ -37,17 +37,14 @@ interface BoardCard {
   status: string;
 }
 
-// ─── GraphQL-запрос ───────────────────────────────────
-async function graphqlRequest<T = any>(
-  query: string,
-  variables: Record<string, any> = {}
-): Promise<T> {
+// GraphQL-запрос
+async function graphqlRequest<T = any>(query: string, variables: Record<string, any> = {}): Promise<T> {
   const response = await fetch("https://api.github.com/graphql", {
     method: "POST",
     headers: {
       Authorization: `bearer ${TOKEN}`,
       "Content-Type": "application/json",
-      "User-Agent": "JiraBoardGenerator/2.0",
+      "User-Agent": "JiraBoardGenerator/2.1",
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -67,7 +64,7 @@ async function graphqlRequest<T = any>(
   return json as T;
 }
 
-// ─── Поиск проекта по названию ────────────────────────
+// Поиск проекта
 async function findProjectId(title: string): Promise<string> {
   const query = `
     query {
@@ -81,25 +78,17 @@ async function findProjectId(title: string): Promise<string> {
       }
     }
   `;
-
   console.log(`🔍 Ищем проект с названием "${title}"...`);
-  const data = await graphqlRequest<{
-    data: { viewer: { projectsV2: { nodes: GitHubProject[] } } };
-  }>(query);
-
+  const data = await graphqlRequest<{ data: { viewer: { projectsV2: { nodes: GitHubProject[] } } } }>(query);
   const projects = data.data.viewer.projectsV2.nodes;
   console.log("📋 Доступные проекты:", JSON.stringify(projects, null, 2));
-
   const project = projects.find((p) => p.title === title);
-  if (!project) {
-    throw new Error(`Проект "${title}" не найден среди доступных`);
-  }
-
+  if (!project) throw new Error(`Проект "${title}" не найден`);
   console.log(`✅ Найден проект ID: ${project.id}`);
   return project.id;
 }
 
-// ─── Загрузка элементов доски ─────────────────────────
+// Загрузка элементов
 async function fetchBoardItems(projectId: string): Promise<ProjectItem[]> {
   const query = `
     query($projectId: ID!) {
@@ -138,33 +127,41 @@ async function fetchBoardItems(projectId: string): Promise<ProjectItem[]> {
       }
     }
   `;
-
   console.log("📥 Загружаем элементы проекта...");
-  const data = await graphqlRequest<{
-    data: { node: { items: { nodes: any[] } } | null };
-  }>(query, { projectId });
-
+  const data = await graphqlRequest<{ data: { node: { items: { nodes: any[] } } | null } }>(query, { projectId });
   const node = data?.data?.node;
   if (!node) {
-    console.error(
-      "❌ Ответ API:",
-      JSON.stringify(data, null, 2)
-    );
-    throw new Error(
-      "Project node is null. Проверь PROJECT_ID и права токена (read:project)."
-    );
+    console.error("❌ Ответ API:", JSON.stringify(data, null, 2));
+    throw new Error("Project node is null. Проверь PROJECT_ID и права токена (read:project).");
   }
 
-  const items: ProjectItem[] = (node.items?.nodes ?? []).map(
-    (raw: any) => raw as ProjectItem
-  );
+  const items: ProjectItem[] = (node.items?.nodes ?? []).map((raw: any) => ({
+    id: raw.id,
+    fieldValues: (raw.fieldValues?.nodes ?? []).map((fv: any) => {
+      if (fv.text !== undefined) {
+        return { type: "text" as const, text: fv.text, field: fv.field };
+      } else if (fv.name !== undefined) {
+        return { type: "select" as const, name: fv.name, field: fv.field };
+      }
+      return { type: "unknown" as const };
+    }),
+    content: raw.content
+      ? {
+          title: raw.content.title ?? undefined,
+          url: raw.content.url ?? undefined,
+          number: raw.content.number ?? undefined,
+        }
+      : null,
+  }));
+
   console.log(`📊 Получено задач: ${items.length}`);
   return items;
 }
 
-// ─── Парсинг элементов в карточки ─────────────────────
+// Парсинг
 function parseItems(items: ProjectItem[]): BoardCard[] {
-  return items.map((item) => {
+  const cards: BoardCard[] = [];
+  for (const item of items) {
     let title = "No title";
     let url = "#";
     let number = "";
@@ -176,7 +173,7 @@ function parseItems(items: ProjectItem[]): BoardCard[] {
       number = item.content.number?.toString() ?? "";
     }
 
-    for (const fv of item.fieldValues ?? []) {
+    for (const fv of item.fieldValues) {
       if (fv.field?.name === "Status") {
         if (fv.type === "select") {
           status = fv.name || "No Status";
@@ -184,12 +181,12 @@ function parseItems(items: ProjectItem[]): BoardCard[] {
         break;
       }
     }
-
-    return { title, url, number, status };
-  });
+    cards.push({ title, url, number, status });
+  }
+  return cards;
 }
 
-// ─── Генерация HTML ───────────────────────────────────
+// Генерация HTML
 function generateHtml(columns: Record<string, BoardCard[]>): string {
   const now = new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
   let html = `<!DOCTYPE html>
@@ -226,24 +223,28 @@ function generateHtml(columns: Record<string, BoardCard[]>): string {
   return html;
 }
 
-// ─── Главная функция ──────────────────────────────────
+// Главная
 async function main() {
   try {
     const projectId = await findProjectId(PROJECT_TITLE);
     const items = await fetchBoardItems(projectId);
     const cards = parseItems(items);
 
-    // Группировка по статусам
-    const columns: Record<string, BoardCard[]> = {
-      Todo: [],
-      "In Progress": [],
-      Done: [],
-    };
+    console.log("Parsed cards:", JSON.stringify(cards, null, 2));
+
+    // Динамическая группировка
+    const columns: Record<string, BoardCard[]> = {};
     for (const card of cards) {
       const col = card.status;
       if (!columns[col]) columns[col] = [];
       columns[col].push(card);
     }
+    // Гарантируем наличие трёх основных колонок
+    if (!columns["Todo"]) columns["Todo"] = [];
+    if (!columns["In Progress"]) columns["In Progress"] = [];
+    if (!columns["Done"]) columns["Done"] = [];
+
+    console.log("Columns:", Object.keys(columns));
 
     const html = generateHtml(columns);
     const fs = await import("fs");
