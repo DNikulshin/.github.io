@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ---------- КОНФИГУРАЦИЯ ----------
-const PROJECT_TITLE = 'My Jira';   // название твоего проекта (можно заменить на ID)
+const PROJECT_TITLE = "@DNikulshin's Monorepos & Apps";
 let PROJECT_ID = '';               // если оставить пустым, скрипт найдёт по названию
 const TOKEN = process.env.GH_TOKEN;
 
