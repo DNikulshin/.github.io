@@ -1,4 +1,4 @@
-name: Update Jira Board (Node.js)
+name: Update Jira Board (TypeScript)
 
 on:
   schedule:
@@ -19,10 +19,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Generate board
+      - name: Run TypeScript board generator
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: node generate_board.js
+        run: npx tsx generate_board.ts
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
