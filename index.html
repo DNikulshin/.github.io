@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira-like Board</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 20px; background: #f0f2f5; }
+        .board { display: flex; gap: 20px; }
+        .column { flex: 1; min-width: 250px; background: #f6f8fa; border-radius: 6px; padding: 10px; }
+        .column h2 { margin-top: 0; }
+        .card { background: white; padding: 10px; margin-bottom: 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .card a { text-decoration: none; color: #0366d6; font-weight: 500; }
+        .card span { font-size: 0.8em; color: #586069; }
+    </style>
+</head>
+<body>
+    <h1>My Jira Board</h1>
+    <p>Last updated: 2026-08-03 19:24:26 UTC</p>
+    <div class="board">
+<div class="column"><h2>Done</h2><div class="card"><a href="https://github.com/DNikulshin/web-drop/issues/1" target="_blank">#1 test</a></div></div><div class="column"><h2>Todo</h2><div class="card"><a href="https://github.com/DNikulshin/jira-github-backend/issues/1" target="_blank">#1 Реализация контрактов между бэкендом и фронтендом</a></div></div><div class="column"><h2>In Progress</h2></div></div></body></html>
